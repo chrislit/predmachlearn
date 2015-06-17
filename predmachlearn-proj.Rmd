@@ -1,0 +1,27 @@
+---
+title: "predmachlearn project"
+author: "Chris Little"
+date: "06/17/2015"
+output:
+  pdf_document: null
+  html_document: null
+---
+```{r results="hide", echo=FALSE, message=FALSE}
+library(knitr)
+
+# set options
+opts_chunk$set(cache = TRUE)
+
+# load libraries
+library(caret)
+library(randomForest)
+library(ggplot2)
+
+# set a seed value
+set.seed(1337)
+```
+
+
+# References
+
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. *Qualitative Activity Recognition of Weight Lifting Exercises.* Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. http://groupware.les.inf.puc-rio.br/har
