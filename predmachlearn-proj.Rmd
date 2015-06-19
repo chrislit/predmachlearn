@@ -1,12 +1,12 @@
 ---
-title: "predmachlearn project"
+title: "Prediction Assignment Writeup"
 author: "Chris Little"
 date: "06/17/2015"
 output:
-  pdf_document: null
   html_document: null
+  pdf_document: null
 ---
-```{r results="hide", echo=FALSE, message=FALSE}
+```{r results="hide", echo=FALSE, message=FALSE, cache=TRUE}
 library(knitr)
 
 # set options
@@ -14,14 +14,74 @@ opts_chunk$set(cache = TRUE)
 
 # load libraries
 library(caret)
+library(e1071)
 library(randomForest)
 library(ggplot2)
+library(doParallel)
 
 # set a seed value
 set.seed(1337)
+
+# make a parallel compute cluster
+cl <- makeCluster(detectCores())
+registerDoParallel(cl)
+
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
 ```
 
+```{r cache=TRUE}
+# load both training/testing & validation sets
+pml_train_valid <- read.csv("./data/pml-training.csv", na.strings = c("", "NA", "#DIV/0!", '""'))
+pml_test <- read.csv("./data/pml-testing.csv", na.strings = c("", "NA", "#DIV/0!", '""'))
 
+# remove columns 1-8 (non-sensor data)
+pml_train_valid <- pml_train_valid[, 8:ncol(pml_train_valid)]
+pml_test <- pml_test[, 8:ncol(pml_test)]
+
+# remove columns with near-zero-variance
+nzv_cols <- nzv(pml_train_valid)
+pml_train_valid <- pml_train_valid[, -nzv_cols]
+pml_test <- pml_test[, -nzv_cols]
+rm(nzv_cols)
+
+# remove columns with NA values in the validation set
+no_na_cols <- !as.logical(colSums(is.na(pml_test)))
+pml_train_valid <- pml_train_valid[,  no_na_cols]
+pml_test <- pml_test[, no_na_cols]
+rm(no_na_cols)
+
+# split the training set into training & validation sets (80%/20%)
+in_valid <- createDataPartition(y = pml_train_valid$classe, p = 0.2, list = FALSE)
+pml_valid <- pml_train_valid[in_valid,]
+pml_train <- pml_train_valid[-in_valid,]
+rm(pml_train_valid)
+```
+
+```{r cache=TRUE}
+# train a random forests predictor
+rf_fit <- train(classe ~ ., data=pml_train, method="rf", prox=TRUE,
+             trainControl=trainControl(method = "repeatedcv", repeats = 5))
+```
+
+```{r}
+rf_pred <- predict(rf_fit, pml_valid[, -ncol(pml_valid)])
+confusionMatrix(rf_pred, pml_valid$classe)
+```
+
+```{r}
+answers <- predict(rf_fit, pml_test[, -ncol(pml_test)])
+pml_write_files(answers)
+```
+
+```{r results="hide", echo=FALSE, message=FALSE}
+stopCluster(cl)
+```
 # References
 
 Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. *Qualitative Activity Recognition of Weight Lifting Exercises.* Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. http://groupware.les.inf.puc-rio.br/har
