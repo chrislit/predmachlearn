@@ -6,6 +6,10 @@ output:
   html_document: null
   pdf_document: null
 ---
+# Introduction
+
+This is a writeup illustrating the application of machine learning (specifically 5-fold cross-validated random forests) to data from Velloso, et al. in order to predict activity type from sensor data.
+
 ```{r results="hide", echo=FALSE, message=FALSE, cache=TRUE}
 library(knitr)
 
@@ -40,25 +44,23 @@ pml_test <- read.csv("./data/pml-testing.csv", na.strings = c("", "NA", "#DIV/0!
 ```
 
 Then, we clean the data frames up by removing irrelevent columns. Columns 1-7 contain non-sensor data.
-```{r}
+```{r cache=TRUE}
 pml_train <- pml_train[, 8:ncol(pml_train)]
 pml_test <- pml_test[, 8:ncol(pml_test)]
 ```
 
 Columns with near zero variance won't be useful as discriminating predictors, so they are removed.
-```{r}
+```{r cache=TRUE}
 nzv_cols <- nzv(pml_train)
 pml_train <- pml_train[, -nzv_cols]
 pml_test <- pml_test[, -nzv_cols]
-rm(nzv_cols)
 ```
 
 Columns that are entirely NAs in the test set obviously can't be used for prediction, so they are removed.
-```{r}
+```{r cache=TRUE}
 no_na_cols <- !as.logical(colSums(is.na(pml_test)))
 pml_train <- pml_train[,  no_na_cols]
 pml_test <- pml_test[, no_na_cols]
-rm(no_na_cols)
 ```
 
 ```{r cache=TRUE, results="hide", echo=FALSE, message=FALSE}
@@ -66,13 +68,27 @@ rm(no_na_cols)
 # rf_fit <- randomForest(classe ~ ., data=pml_train)
 ```
 
-Next, using random forests with PCA-preprocessing, a predictor is trained from the training set. All of the sensor data is used to build the model that predicts classe. 5-fold cross-validation is performed by the trainer.
-```{r cache=TRUE, message=FALSE}
+Next, using random forests with PCA-preprocessing, a predictor is trained from the training set. All of the sensor data is used to build the model that predicts classe. 5-fold cross-validation is performed by the trainer. (This model takes a long time to train, so it is serialized to disk and only trained from the data if it is absent from disk.)
+```{r message=FALSE}
 tc <- trainControl(method = "cv", number = 5)
-rf_fit <- train(classe ~ ., data = pml_train,  preProcess = c("pca"),  method = "rf",
+if (!file.exists("rf_fit.rds")) {
+  rf_fit <- train(classe ~ ., data = pml_train,  preProcess = c("pca"),  method = "rf",
                   prox = TRUE, trControl = tc)
+  saveRDS(rf_fit, file = "rf_fit.rds")
+} else {
+  readRDS(rf_fit, file = "rf_fit.rds")
+}
 ```
 
+With the selected model, accuracy is 0.981 (so we expect an error rate of 0.019) and $\kappa$ is 0.976:
+```{r cache=TRUE}
+rf_fit
+```
+
+A cross-validated confusion matrix of the model's predictions illustrates its good fit:
+```{r cache=TRUE}
+confusionMatrix(rf_fit)
+```
 
 ```{r cache=TRUE, results="hide", echo=FALSE, message=FALSE}
 #rf_pred <- predict(rf_fit, pml_valid[, -ncol(pml_valid)])
@@ -80,7 +96,7 @@ rf_fit <- train(classe ~ ., data = pml_train,  preProcess = c("pca"),  method = 
 ```
 
 With a well-trained model, we perform prediction on the test set:
-```{r}
+```{r cache=TRUE}
 answers <- predict(rf_fit, pml_test[, -ncol(pml_test)])
 pml_write_files(answers)
 ```
