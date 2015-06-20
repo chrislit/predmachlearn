@@ -14,17 +14,11 @@ opts_chunk$set(cache = TRUE)
 
 # load libraries
 library(caret)
-library(e1071)
 library(randomForest)
-library(ggplot2)
-library(doParallel)
 
 # set a seed value
+# set.seed(as.integer(Sys.time()))
 set.seed(1337)
-
-# make a parallel compute cluster
-cl <- makeCluster(detectCores())
-registerDoParallel(cl)
 
 pml_write_files = function(x){
   n = length(x)
@@ -33,55 +27,64 @@ pml_write_files = function(x){
     write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
   }
 }
+
+setwd("~/coursework/predmachlearn")
 ```
 
+# Data Clean-up
+
+First, we load the training & testing data from disk.
 ```{r cache=TRUE}
-# load both training/testing & validation sets
-pml_train_valid <- read.csv("./data/pml-training.csv", na.strings = c("", "NA", "#DIV/0!", '""'))
+pml_train <- read.csv("./data/pml-training.csv", na.strings = c("", "NA", "#DIV/0!", '""'))
 pml_test <- read.csv("./data/pml-testing.csv", na.strings = c("", "NA", "#DIV/0!", '""'))
+```
 
-# remove columns 1-8 (non-sensor data)
-pml_train_valid <- pml_train_valid[, 8:ncol(pml_train_valid)]
+Then, we clean the data frames up by removing irrelevent columns. Columns 1-7 contain non-sensor data.
+```{r}
+pml_train <- pml_train[, 8:ncol(pml_train)]
 pml_test <- pml_test[, 8:ncol(pml_test)]
+```
 
-# remove columns with near-zero-variance
-nzv_cols <- nzv(pml_train_valid)
-pml_train_valid <- pml_train_valid[, -nzv_cols]
+Columns with near zero variance won't be useful as discriminating predictors, so they are removed.
+```{r}
+nzv_cols <- nzv(pml_train)
+pml_train <- pml_train[, -nzv_cols]
 pml_test <- pml_test[, -nzv_cols]
 rm(nzv_cols)
+```
 
-# remove columns with NA values in the validation set
+Columns that are entirely NAs in the test set obviously can't be used for prediction, so they are removed.
+```{r}
 no_na_cols <- !as.logical(colSums(is.na(pml_test)))
-pml_train_valid <- pml_train_valid[,  no_na_cols]
+pml_train <- pml_train[,  no_na_cols]
 pml_test <- pml_test[, no_na_cols]
 rm(no_na_cols)
-
-# split the training set into training & validation sets (80%/20%)
-in_valid <- createDataPartition(y = pml_train_valid$classe, p = 0.2, list = FALSE)
-pml_valid <- pml_train_valid[in_valid,]
-pml_train <- pml_train_valid[-in_valid,]
-rm(pml_train_valid)
 ```
 
-```{r cache=TRUE}
+```{r cache=TRUE, results="hide", echo=FALSE, message=FALSE}
 # train a random forests predictor
-rf_fit <- train(classe ~ ., data=pml_train, method="rf", prox=TRUE,
-             trainControl=trainControl(method = "repeatedcv", repeats = 5))
+# rf_fit <- randomForest(classe ~ ., data=pml_train)
 ```
 
-```{r}
-rf_pred <- predict(rf_fit, pml_valid[, -ncol(pml_valid)])
-confusionMatrix(rf_pred, pml_valid$classe)
+Next, using random forests with PCA-preprocessing, a predictor is trained from the training set. All of the sensor data is used to build the model that predicts classe. 5-fold cross-validation is performed by the trainer.
+```{r cache=TRUE, message=FALSE}
+tc <- trainControl(method = "cv", number = 5)
+rf_fit <- train(classe ~ ., data = pml_train,  preProcess = c("pca"),  method = "rf",
+                  prox = TRUE, trControl = tc)
 ```
 
+
+```{r cache=TRUE, results="hide", echo=FALSE, message=FALSE}
+#rf_pred <- predict(rf_fit, pml_valid[, -ncol(pml_valid)])
+#confusionMatrix(rf_pred, pml_valid$classe)
+```
+
+With a well-trained model, we perform prediction on the test set:
 ```{r}
 answers <- predict(rf_fit, pml_test[, -ncol(pml_test)])
 pml_write_files(answers)
 ```
 
-```{r results="hide", echo=FALSE, message=FALSE}
-stopCluster(cl)
-```
 # References
 
 Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. *Qualitative Activity Recognition of Weight Lifting Exercises.* Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. http://groupware.les.inf.puc-rio.br/har
