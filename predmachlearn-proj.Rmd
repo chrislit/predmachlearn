@@ -3,12 +3,13 @@ title: "Prediction Assignment Writeup"
 author: "Chris Little"
 date: "06/17/2015"
 output:
-  html_document: null
   pdf_document: null
+  html_document: null
 ---
+
 # Introduction
 
-This is a writeup illustrating the application of machine learning (specifically 5-fold cross-validated random forests) to data from Velloso, et al. in order to predict activity type from sensor data.
+This is a writeup illustrating the application of machine learning (specifically 5-fold cross-validated random forests) to data from [Velloso, et al. 2013] in order to predict activity type from sensor data.
 
 ```{r results="hide", echo=FALSE, message=FALSE, cache=TRUE}
 library(knitr)
@@ -68,22 +69,22 @@ pml_test <- pml_test[, no_na_cols]
 # rf_fit <- randomForest(classe ~ ., data=pml_train)
 ```
 
+# Model Training and Cross-Validation
+
 Next, using random forests with PCA-preprocessing, a predictor is trained from the training set. All of the sensor data is used to build the model that predicts classe. 5-fold cross-validation is performed by the trainer. (This model takes a long time to train, so it is serialized to disk and only trained from the data if it is absent from disk.)
 ```{r message=FALSE}
-tc <- trainControl(method = "cv", number = 5)
 if (!file.exists("rf_fit.rds")) {
+  tc <- trainControl(method = "cv", number = 5)
   rf_fit <- train(classe ~ ., data = pml_train,  preProcess = c("pca"),  method = "rf",
                   prox = TRUE, trControl = tc)
   saveRDS(rf_fit, file = "rf_fit.rds")
+  rf_fit
 } else {
   readRDS(rf_fit, file = "rf_fit.rds")
 }
 ```
 
-With the selected model, accuracy is 0.981 (so we expect an error rate of 0.019) and $\kappa$ is 0.976:
-```{r cache=TRUE}
-rf_fit
-```
+With the selected model, accuracy is 0.981 (so we expect an error rate of 0.019) and $\kappa$ is 0.976.
 
 A cross-validated confusion matrix of the model's predictions illustrates its good fit:
 ```{r cache=TRUE}
@@ -95,8 +96,8 @@ confusionMatrix(rf_fit)
 #confusionMatrix(rf_pred, pml_valid$classe)
 ```
 
-With a well-trained model, we perform prediction on the test set:
-```{r cache=TRUE}
+```{r cache=TRUE, results="hide", echo=FALSE, message=FALSE}
+# With a well-trained model, we perform prediction on the test set:
 answers <- predict(rf_fit, pml_test[, -ncol(pml_test)])
 pml_write_files(answers)
 ```
@@ -104,3 +105,4 @@ pml_write_files(answers)
 # References
 
 Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. *Qualitative Activity Recognition of Weight Lifting Exercises.* Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013. http://groupware.les.inf.puc-rio.br/har
+
