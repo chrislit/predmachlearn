@@ -3,8 +3,8 @@ title: "Prediction Assignment Writeup"
 author: "Chris Little"
 date: "06/17/2015"
 output:
-  pdf_document: null
   html_document: null
+  pdf_document: null
 ---
 
 # Introduction
